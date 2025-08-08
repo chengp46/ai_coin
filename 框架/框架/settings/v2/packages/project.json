@@ -1,0 +1,43 @@
+{
+  "__version__": "1.0.6",
+  "general": {
+    "designResolution": {
+      "height": 736,
+      "fitWidth": true,
+      "fitHeight": true
+    }
+  },
+  "custom_joint_texture_layouts": [],
+  "physics": {
+    "collisionGroups": [
+      {
+        "index": 1,
+        "name": "Player"
+      },
+      {
+        "index": 2,
+        "name": "Obs"
+      },
+      {
+        "index": 3,
+        "name": "Bonus"
+      },
+      {
+        "index": 4,
+        "name": "Spring"
+      },
+      {
+        "index": 5,
+        "name": "Bot"
+      }
+    ],
+    "collisionMatrix": {
+      "0": 1,
+      "1": 60,
+      "2": 34,
+      "3": 2,
+      "4": 2,
+      "5": 6
+    }
+  }
+}

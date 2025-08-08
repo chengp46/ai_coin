@@ -1,0 +1,16 @@
+[
+    {
+        "key": "img_1",
+        "path": "textures/sz2_cn",
+        "bLanguage": 0,
+        "imageName": 1,
+        "bundle": null
+    },
+    {
+        "key": "img_2",
+        "path": "textures/bz2_cn",
+        "bLanguage": 0,
+        "imageName": 2,
+        "bundle": null
+    }
+]

@@ -1,0 +1,38 @@
+功能说明
+创建主窗口 (tk.Tk())
+
+设置窗口标题 title("Simple GUI")
+设置窗口大小 geometry("300x200")
+添加 Label 标签
+
+显示提示文字 "请输入你的名字："
+使用 pack(pady=10) 添加上下间距
+创建 Entry 输入框
+
+用于用户输入内容
+创建 Button 按钮
+
+绑定 on_click() 事件，点击后获取输入框内容并更新 Label 显示
+启动 mainloop() 事件循环
+
+让窗口保持运行，等待用户操作
+
+
+运行  python gui.py
+
+
+1. 安装 PyInstaller
+在终端（cmd 或 PowerShell）中运行：
+pip install pyinstaller
+如果已经安装，可以用以下命令确认：
+
+pyinstaller --version
+
+python -m PyInstaller --onefile --windowed main.py
+
+自定义图标
+pyinstaller --onefile --windowed --icon=icon.ico gui.py
+
+让 EXE 更小
+如果生成的 EXE 文件很大，可以尝试：
+pyinstaller --onefile --windowed --noconsole --clean simple_gui.py

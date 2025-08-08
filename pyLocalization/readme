@@ -1,0 +1,2 @@
+安装 Pandas 和 openpyxl
+pip install pandas openpyxl
