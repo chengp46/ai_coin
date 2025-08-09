@@ -1,11 +1,20 @@
 package main
 
-type IConnector interface {
-	SendData(data []byte)
-	Close()
+import (
+	"fmt"
+	"unsafe"
+
+	"goserver/wsnet"
+)
+
+func main() {
+	var wsServer = &wsnet.WsServer{Clients: make(map[int]*wsnet.WsConnector)}
+	wsServer.SetCallback(handleMessage)
+	wsServer.Start(8080)
 }
 
-type IServer interface {
-	Start(port int)
-	HandleMessage(conn IConnector, data []byte)
+func handleMessage(conn wsnet.IConnector, data []byte) {
+	fmt.Printf("%s\n", data)
+	s := "hello client"
+	conn.SendData(unsafe.Slice(unsafe.StringData(s), len(s)))
 }
