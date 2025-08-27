@@ -1,0 +1,15 @@
+info face="face" size=31
+common lineHeight=31 scaleW=98 scaleH=95 pages=1
+page id=0 file="Font01.png"
+chars count=11
+char id=54 x=76 y=0 width=21 height=31 xoffset=0 yoffset=0 xadvance=21 page=0 chnl=15
+char id=50 x=76 y=32 width=19 height=30 xoffset=0 yoffset=0 xadvance=19 page=0 chnl=15
+char id=57 x=0 y=63 width=20 height=31 xoffset=0 yoffset=0 xadvance=20 page=0 chnl=15
+char id=49 x=23 y=32 width=16 height=30 xoffset=0 yoffset=0 xadvance=16 page=0 chnl=15
+char id=53 x=63 y=63 width=19 height=31 xoffset=0 yoffset=0 xadvance=19 page=0 chnl=15
+char id=52 x=0 y=32 width=22 height=30 xoffset=0 yoffset=0 xadvance=22 page=0 chnl=15
+char id=51 x=21 y=63 width=20 height=31 xoffset=0 yoffset=0 xadvance=20 page=0 chnl=15
+char id=48 x=29 y=0 width=23 height=31 xoffset=0 yoffset=0 xadvance=23 page=0 chnl=15
+char id=56 x=53 y=0 width=22 height=31 xoffset=0 yoffset=0 xadvance=22 page=0 chnl=15
+char id=37 x=0 y=0 width=28 height=31 xoffset=0 yoffset=0 xadvance=28 page=0 chnl=15
+char id=55 x=42 y=63 width=20 height=31 xoffset=0 yoffset=0 xadvance=20 page=0 chnl=15

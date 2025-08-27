@@ -1,0 +1,7 @@
+1、记得进入Demo目录执行npm install crypto-es
+2、然后使用cocos3.8.4打开项目，3.8.x应该都行吧
+3、如果要运行网络示例，需要运行DemoServer里的main.go
+
+
+cd Demo
+npm install crypto-es

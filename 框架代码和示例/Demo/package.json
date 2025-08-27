@@ -1,0 +1,10 @@
+{
+  "name": "GameClient",
+  "uuid": "1947dcf0-221e-49d6-b472-645ffc1cce18",
+  "creator": {
+    "version": "3.8.4"
+  },
+  "dependencies": {
+    "crypto-es": "^2.1.0"
+  }
+}
