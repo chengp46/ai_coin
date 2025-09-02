@@ -11,9 +11,24 @@ import (
 )
 
 type WsConnector struct {
+	sync.RWMutex
 	Conn     *websocket.Conn
 	ConnId   int64
 	SendChan chan []byte
+	data     map[string]any
+}
+
+func (g *WsConnector) Put(key string, v any) {
+	g.Lock()
+	defer g.Unlock()
+	g.data[key] = v
+}
+
+func (g *WsConnector) Get(key string) (any, bool) {
+	g.RLock()
+	defer g.RUnlock()
+	v, ok := g.data[key]
+	return v, ok
 }
 
 func (g *WsConnector) SendData(data []byte) {
@@ -24,6 +39,13 @@ func (g *WsConnector) SendData(data []byte) {
 		close(g.SendChan) // 通知 WriteMessage 退出
 		fmt.Printf("send timeout, client %d disconnected", g.ConnId)
 	}
+}
+
+func (g *WsConnector) Close() {
+	g.Lock()
+	defer g.Unlock()
+	g.Conn.Close()
+	g.data = make(map[string]any)
 }
 
 func (g *WsConnector) ReadMessage(server *WsServer) {
@@ -91,6 +113,8 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
+	ReadBufferSize:  4096, // 增加缓冲区大小
+	WriteBufferSize: 4096, // 增加缓冲区大小
 }
 
 func (g *WsServer) Start(port int) {
@@ -133,4 +157,11 @@ func (g *WsServer) Start(port int) {
 
 func (g *WsServer) SetCallback(cb HandleCallback) {
 	g.Callback = cb
+}
+
+func (g *WsServer) Close() {
+	for _, v := range g.Clients {
+		v.Close()
+	}
+	clear(g.Clients)
 }

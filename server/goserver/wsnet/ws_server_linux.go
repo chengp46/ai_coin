@@ -14,10 +14,25 @@ import (
 )
 
 type WsConnector struct {
+	sync.RWMutex
 	Conn     net.Conn
 	ConnId   int64
 	LastPing time.Time
+	data     map[string]any
 	Mutex    sync.Mutex
+}
+
+func (c *WsConnector) Put(key string, v any) {
+	c.Lock()
+	defer c.Unlock()
+	c.data[key] = v
+}
+
+func (c *WsConnector) Get(key string) (any, bool) {
+	c.RLock()
+	defer c.RUnlock()
+	v, ok := c.data[key]
+	return v, ok
 }
 
 func (c *WsConnector) SendData(data []byte) {
@@ -34,14 +49,21 @@ func (c *WsConnector) SendData(data []byte) {
 
 func (c *WsConnector) UpdatePing() {
 	c.Mutex.Lock()
+	defer c.Mutex.Unlock()
 	c.LastPing = time.Now()
-	c.Mutex.Unlock()
 }
 
 func (c *WsConnector) IsAlive(timeout time.Duration) bool {
 	c.Mutex.Lock()
 	defer c.Mutex.Unlock()
 	return time.Since(c.LastPing) <= timeout
+}
+
+func (g *WsConnector) Close() {
+	g.Lock()
+	defer g.Unlock()
+	g.Conn.Close()
+	g.data = make(map[string]any)
 }
 
 type WsServer struct {
