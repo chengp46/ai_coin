@@ -20,7 +20,8 @@ func (g *WsConnector) SendData(data []byte) {
 	select {
 	case g.SendChan <- data:
 	case <-time.After(time.Second):
-		g.Close() // 主动断开连接
+		g.Conn.Close()    // 主动断开连接
+		close(g.SendChan) // 通知 WriteMessage 退出
 		fmt.Printf("send timeout, client %d disconnected", g.ConnId)
 	}
 }
@@ -70,11 +71,6 @@ func (g *WsConnector) WriteMessage(server *WsServer) {
 			}
 		}
 	}
-}
-
-func (g *WsConnector) Close() {
-	g.Conn.Close()
-	close(g.SendChan) // 通知 WriteMessage 退出
 }
 
 type WsServer struct {
