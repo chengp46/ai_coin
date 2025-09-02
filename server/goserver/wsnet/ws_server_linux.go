@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gobwas/ws"
@@ -14,41 +15,50 @@ import (
 
 type WsConnector struct {
 	Conn     net.Conn
-	ConnId   int
+	ConnId   int64
 	LastPing time.Time
 	Mutex    sync.Mutex
 }
 
-func (g *WsConnector) SendData(data []byte) {
-	g.Mutex.Lock()
-	g.LastPing = time.Now()
-	g.Mutex.Unlock()
-	err := wsutil.WriteServerBinary(g.Conn, data)
+func (c *WsConnector) SendData(data []byte) {
+	c.Mutex.Lock()
+	c.LastPing = time.Now()
+	c.Mutex.Unlock()
+
+	err := wsutil.WriteServerBinary(c.Conn, data)
 	if err != nil {
-		log.Fatalf("SendData err: %v", err)
+		log.Printf("SendData err: %v", err)
+		_ = c.Conn.Close()
 	}
 }
 
-func (g *WsConnector) UpdatePing() {
-	g.Mutex.Lock()
-	defer g.Mutex.Unlock()
-	g.LastPing = time.Now()
+func (c *WsConnector) UpdatePing() {
+	c.Mutex.Lock()
+	c.LastPing = time.Now()
+	c.Mutex.Unlock()
 }
 
-func (g *WsConnector) IsAlive(timeout time.Duration) bool {
-	g.Mutex.Lock()
-	defer g.Mutex.Unlock()
-	return time.Since(g.LastPing) <= timeout
+func (c *WsConnector) IsAlive(timeout time.Duration) bool {
+	c.Mutex.Lock()
+	defer c.Mutex.Unlock()
+	return time.Since(c.LastPing) <= timeout
 }
 
 type WsServer struct {
 	Mutex    sync.RWMutex
-	Clients  map[int]*WsConnector
+	Clients  map[int64]*WsConnector
 	Callback HandleCallback
+	nextID   int64
 }
 
-func (g *WsServer) Start(port int) {
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
+func NewWsServer() *WsServer {
+	return &WsServer{
+		Clients: make(map[int64]*WsConnector),
+	}
+}
+
+func (s *WsServer) Start(port int) {
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatalf("listen err: %v", err)
 	}
@@ -58,76 +68,86 @@ func (g *WsServer) Start(port int) {
 		log.Fatalf("netpoll err: %v", err)
 	}
 
-	g.StartHeartbeat(30 * time.Second)
+	s.StartHeartbeat(30 * time.Second)
 
 	for {
-		// 接收连接并升级为 WebSocket（或普通 TCP）
 		connRaw, err := ln.Accept()
 		if err != nil {
 			continue
 		}
+
 		go func(conn net.Conn) {
-			// 升级 WebSocket
 			_, err := ws.Upgrade(conn)
 			if err != nil {
-				conn.Close()
+				_ = conn.Close()
 				return
 			}
 
-			connectIndex++
+			connID := atomic.AddInt64(&s.nextID, 1)
 			c := &WsConnector{
 				Conn:     conn,
-				ConnId:   connectIndex,
+				ConnId:   connID,
 				LastPing: time.Now(),
 			}
-			g.Clients[c.ConnId] = c
+
+			s.Mutex.Lock()
+			s.Clients[connID] = c
+			s.Mutex.Unlock()
+
 			conn.SetReadDeadline(time.Now().Add(35 * time.Second))
-			desc := netpoll.Must(netpoll.HandleReadOnce(connRaw)) // 只监听一次 Read 事件
-			poller.Start(desc, func(ev netpoll.Event) {
+			desc := netpoll.Must(netpoll.HandleReadOnce(conn))
+			err = poller.Start(desc, func(ev netpoll.Event) {
 				if ev&(netpoll.EventReadHup|netpoll.EventHup) != 0 {
-					g.Mutex.Lock()
-					delete(g.Clients, c.ConnId)
-					g.Mutex.Unlock()
-					conn.Close()
+					s.removeClient(c)
 					return
 				}
 
-				// 处理客户端消息
 				data, err := wsutil.ReadClientBinary(conn)
 				if err != nil {
-					g.Mutex.Lock()
-					delete(g.Clients, c.ConnId)
-					g.Mutex.Unlock()
-					conn.Close()
+					s.removeClient(c)
 					return
 				}
-				// 判断是否是 PING/PONG 消息（或加入自定义协议类型）
-				c.UpdatePing()
 
-				if g.Callback != nil {
-					g.Callback(c, data)
+				c.UpdatePing()
+				if s.Callback != nil {
+					s.Callback(c, data)
 				}
-				// 重新订阅读事件
+				// 继续订阅读事件
 				poller.Resume(desc)
 			})
+			if err != nil {
+				log.Printf("poller start err: %v", err)
+				s.removeClient(c)
+			}
 		}(connRaw)
 	}
 }
 
-func (g *WsServer) SetCallback(cb HandleCallback) {
-	g.Callback = cb
+func (s *WsServer) removeClient(c *WsConnector) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+	_ = c.Conn.Close()
+	delete(s.Clients, c.ConnId)
 }
 
-func (g *WsServer) StartHeartbeat(timeout time.Duration) {
+func (s *WsServer) SetCallback(cb HandleCallback) {
+	s.Callback = cb
+}
+
+func (s *WsServer) StartHeartbeat(timeout time.Duration) {
 	ticker := time.NewTicker(timeout / 2)
 	go func() {
 		for range ticker.C {
-			for _, c := range g.Clients {
+			s.Mutex.RLock()
+			clients := make([]*WsConnector, 0, len(s.Clients))
+			for _, c := range s.Clients {
+				clients = append(clients, c)
+			}
+			s.Mutex.RUnlock()
+
+			for _, c := range clients {
 				if !c.IsAlive(timeout) {
-					c.Conn.Close()
-					g.Mutex.Lock()
-					delete(g.Clients, c.ConnId)
-					g.Mutex.Unlock()
+					s.removeClient(c)
 				}
 			}
 		}

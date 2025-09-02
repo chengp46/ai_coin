@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	var wsServer = &wsnet.WsServer{Clients: make(map[int]*wsnet.WsConnector)}
+	var wsServer = wsnet.NewWsServer()
 	wsServer.SetCallback(handleMessage)
 	wsServer.Start(8080)
 }

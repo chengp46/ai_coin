@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -11,12 +12,17 @@ import (
 
 type WsConnector struct {
 	Conn     *websocket.Conn
-	ConnId   int
+	ConnId   int64
 	SendChan chan []byte
 }
 
 func (g *WsConnector) SendData(data []byte) {
-	g.SendChan <- data
+	select {
+	case g.SendChan <- data:
+	case <-time.After(time.Second):
+		g.Close() // 主动断开连接
+		fmt.Printf("send timeout, client %d disconnected", g.ConnId)
+	}
 }
 
 func (g *WsConnector) ReadMessage(server *WsServer) {
@@ -53,8 +59,7 @@ func (g *WsConnector) WriteMessage(server *WsServer) {
 				g.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			err := g.Conn.WriteMessage(websocket.BinaryMessage, message)
-			if err != nil {
+			if err := g.Conn.WriteMessage(websocket.BinaryMessage, message); err != nil {
 				return
 			}
 		case <-ticker.C:
@@ -67,10 +72,22 @@ func (g *WsConnector) WriteMessage(server *WsServer) {
 	}
 }
 
+func (g *WsConnector) Close() {
+	g.Conn.Close()
+	close(g.SendChan) // 通知 WriteMessage 退出
+}
+
 type WsServer struct {
 	Mutex    sync.RWMutex
-	Clients  map[int]*WsConnector
+	Clients  map[int64]*WsConnector
 	Callback HandleCallback
+	nextID   int64
+}
+
+func NewWsServer() *WsServer {
+	return &WsServer{
+		Clients: make(map[int64]*WsConnector),
+	}
 }
 
 var upgrader = websocket.Upgrader{
@@ -88,16 +105,16 @@ func (g *WsServer) Start(port int) {
 			fmt.Println("Upgrade error:", err)
 			return
 		}
-		connectIndex++
+		connID := atomic.AddInt64(&g.nextID, 1)
 		connector := &WsConnector{
 			Conn:     connect,
-			ConnId:   connectIndex,
-			SendChan: make(chan []byte, 2048),
+			ConnId:   connID,
+			SendChan: make(chan []byte, 4096),
 		}
 		g.Mutex.Lock()
-		g.Clients[connectIndex] = connector
+		g.Clients[connID] = connector
 		g.Mutex.Unlock()
-		connect.SetReadLimit(8129)
+		connect.SetReadLimit(8192)
 		connect.SetReadDeadline(time.Now().Add(pongWait))
 		connect.SetPongHandler(func(appData string) error {
 			connect.SetReadDeadline(time.Now().Add(pongWait))
