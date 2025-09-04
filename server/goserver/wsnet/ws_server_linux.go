@@ -175,3 +175,10 @@ func (s *WsServer) StartHeartbeat(timeout time.Duration) {
 		}
 	}()
 }
+
+func (s *WsServer) Close() {
+	for _, v := range s.Clients {
+		v.Close()
+	}
+	clear(s.Clients)
+}
